@@ -1548,9 +1548,9 @@ function validateAndGoTo3() {
     return;
   }
   buildResults();
-  goTo(3);
-  // Save to Google Sheets after showing results
+  // Save BEFORE navigating
   saveToGoogleSheets();
+  goTo(3);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1851,118 +1851,60 @@ function buildResults() {
 // SAVE TO GOOGLE SHEETS
 // ═══════════════════════════════════════════════════════
 function saveToGoogleSheets() {
-  var overlay = document.getElementById('save-overlay');
-  var title = document.getElementById('save-title');
-  var message = document.getElementById('save-message');
-  var spinner = document.getElementById('save-spinner');
+  try {
+    var results = calcResults();
 
-  // Verificar que la URL está configurada
-  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL === 'PEGA_AQUI_TU_URL_DEL_WEB_APP') {
-    alert('⚠️ ERROR: No has configurado la URL del Apps Script.\nEdita la variable APPS_SCRIPT_URL en el código.');
-    return;
-  }
+    var p = [];
+    p.push('timestamp=' + encodeURIComponent(new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })));
+    p.push('empresa=' + encodeURIComponent(document.getElementById('empresa').value));
+    p.push('nit=' + encodeURIComponent(document.getElementById('nit').value));
+    p.push('municipio=' + encodeURIComponent(document.getElementById('municipio').value));
+    p.push('actividad=' + encodeURIComponent(document.getElementById('actividad').value));
+    p.push('tamano=' + encodeURIComponent(document.getElementById('tamano').value));
+    p.push('nombre=' + encodeURIComponent(document.getElementById('nombre').value));
+    p.push('cargo=' + encodeURIComponent(document.getElementById('cargo').value));
+    p.push('telefono=' + encodeURIComponent(document.getElementById('telefono').value));
+    p.push('email=' + encodeURIComponent(document.getElementById('email').value));
+    p.push('compromiso_apoyo=' + encodeURIComponent(state.commitment.apoyo || ''));
+    p.push('compromiso_recursos=' + encodeURIComponent(state.commitment.recursos || ''));
+    p.push('compromiso_prioridad=' + encodeURIComponent(state.commitment.prioridad || ''));
+    p.push('M0=' + state.scores[1]);
+    p.push('M1=' + state.scores[2]);
+    p.push('M2=' + state.scores[3]);
+    p.push('M3=' + state.scores[4]);
+    p.push('M4=' + state.scores[5]);
+    p.push('M5=' + state.scores[6]);
+    p.push('M6=' + state.scores[7]);
+    p.push('M7=' + state.scores[8]);
+    p.push('M8=' + state.scores[9]);
+    p.push('M9=' + state.scores[10]);
+    p.push('M10=' + state.scores[11]);
+    p.push('M11=' + state.scores[12]);
+    p.push('M12=' + state.scores[13]);
+    p.push('M13=' + state.scores[14]);
+    p.push('promedio_global=' + parseFloat(results.globalAvg).toFixed(2));
+    p.push('porcentaje_global=' + parseFloat(results.globalPct).toFixed(1));
+    p.push('estado_madurez=' + encodeURIComponent(results.globalState.name));
+    p.push('prom_etapa1=' + results.etapaScores[1].avg);
+    p.push('prom_etapa2=' + results.etapaScores[2].avg);
+    p.push('prom_etapa3=' + results.etapaScores[3].avg);
+    p.push('prom_etapa4=' + results.etapaScores[4].avg);
 
-  overlay.classList.add('active');
-  title.textContent = 'Guardando resultados...';
-  message.textContent = 'Enviando diagnóstico a la base de datos';
-  message.className = '';
-  spinner.style.display = 'block';
+    var url = APPS_SCRIPT_URL + '?' + p.join('&');
 
-  var results = calcResults();
+    // DEBUG — quitar después de confirmar que funciona
+    console.log('SAVE URL:', url);
+    console.log('URL length:', url.length);
 
-  // Build URL params
-  var params = new URLSearchParams();
-  params.append('timestamp', new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' }));
-  params.append('empresa', document.getElementById('empresa').value);
-  params.append('nit', document.getElementById('nit').value);
-  params.append('municipio', document.getElementById('municipio').value);
-  params.append('actividad', document.getElementById('actividad').value);
-  params.append('tamano', document.getElementById('tamano').value);
-  params.append('nombre', document.getElementById('nombre').value);
-  params.append('cargo', document.getElementById('cargo').value);
-  params.append('telefono', document.getElementById('telefono').value);
-  params.append('email', document.getElementById('email').value);
-  params.append('compromiso_apoyo', state.commitment.apoyo || '');
-  params.append('compromiso_recursos', state.commitment.recursos || '');
-  params.append('compromiso_prioridad', state.commitment.prioridad || '');
-  params.append('M0', state.scores[1]);
-  params.append('M1', state.scores[2]);
-  params.append('M2', state.scores[3]);
-  params.append('M3', state.scores[4]);
-  params.append('M4', state.scores[5]);
-  params.append('M5', state.scores[6]);
-  params.append('M6', state.scores[7]);
-  params.append('M7', state.scores[8]);
-  params.append('M8', state.scores[9]);
-  params.append('M9', state.scores[10]);
-  params.append('M10', state.scores[11]);
-  params.append('M11', state.scores[12]);
-  params.append('M12', state.scores[13]);
-  params.append('M13', state.scores[14]);
-  params.append('promedio_global', parseFloat(results.globalAvg).toFixed(2));
-  params.append('porcentaje_global', parseFloat(results.globalPct).toFixed(1));
-  params.append('estado_madurez', results.globalState.name);
-  params.append('prom_etapa1', results.etapaScores[1].avg);
-  params.append('prom_etapa2', results.etapaScores[2].avg);
-  params.append('prom_etapa3', results.etapaScores[3].avg);
-  params.append('prom_etapa4', results.etapaScores[4].avg);
-
-  var fullUrl = APPS_SCRIPT_URL + '?' + params.toString();
-
-  // DEBUG: mostrar la URL en consola para poder probarla manualmente
-  console.log('=== DEBUG SAVE ===');
-  console.log('URL length:', fullUrl.length);
-  console.log('URL (copiar y pegar en navegador para probar):', fullUrl);
-
-  // Método 1: Script tag injection (más confiable que img para Apps Script)
-  var script = document.createElement('script');
-  script.src = fullUrl + '&callback=onSaveComplete';
-
-  window.onSaveComplete = function() {
-    spinner.style.display = 'none';
-    title.textContent = '✅ ¡Guardado exitosamente!';
-    message.textContent = 'Diagnóstico registrado en la base de datos.';
-    message.className = 'save-success';
-    setTimeout(function() { overlay.classList.remove('active'); }, 2500);
-  };
-
-  script.onload = function() {
-    // Script loaded = request reached Google
-    if (spinner.style.display !== 'none') {
-      spinner.style.display = 'none';
-      title.textContent = '✅ ¡Guardado exitosamente!';
-      message.textContent = 'Diagnóstico registrado en la base de datos.';
-      message.className = 'save-success';
-      setTimeout(function() { overlay.classList.remove('active'); }, 2500);
-    }
-  };
-
-  script.onerror = function() {
-    console.log('Script inject failed, trying Image beacon...');
-    // Fallback: Image beacon
+    // Image beacon — el método más simple y confiable
     var img = new Image();
-    img.onload = img.onerror = function() {
-      spinner.style.display = 'none';
-      title.textContent = '✅ Enviado';
-      message.textContent = 'Diagnóstico enviado (verificar en la hoja).';
-      message.className = 'save-success';
-      setTimeout(function() { overlay.classList.remove('active'); }, 2500);
-    };
-    img.src = fullUrl;
-  };
+    img.src = url;
 
-  document.body.appendChild(script);
-
-  // Timeout safety net
-  setTimeout(function() {
-    if (spinner.style.display !== 'none') {
-      spinner.style.display = 'none';
-      title.textContent = '⏱️ Tiempo agotado';
-      message.innerHTML = 'No se confirmó el guardado.<br><br><strong>Debug:</strong> Abre la consola (F12) y copia la URL que aparece. Pégala en el navegador. Si guarda ahí, el problema es CORS/iframe.';
-      message.className = 'save-error';
-      setTimeout(function() { overlay.classList.remove('active'); }, 8000);
-    }
-  }, 10000);
+  } catch (err) {
+    // Si hay error, mostrarlo para debug
+    alert('Error en saveToGoogleSheets: ' + err.message);
+    console.error('saveToGoogleSheets error:', err);
+  }
 }
 
 // ═══════════════════════════════════════════════════════
