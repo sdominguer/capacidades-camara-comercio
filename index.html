@@ -451,28 +451,73 @@ function buildResults(){
 
 // ═══ SAVE ═══
 function saveToGoogleSheets(){
-  try{var r=calcResults();var p=[];
-  p.push('timestamp='+encodeURIComponent(new Date().toLocaleString('es-CO',{timeZone:'America/Bogota'})));
-  p.push('empresa='+encodeURIComponent(document.getElementById('empresa').value));
-  p.push('nit='+encodeURIComponent(document.getElementById('nit').value));
-  p.push('municipio='+encodeURIComponent(document.getElementById('municipio').value));
-  p.push('actividad='+encodeURIComponent(document.getElementById('actividad').value));
-  p.push('tamano='+encodeURIComponent(document.getElementById('tamano').value));
-  p.push('nombre='+encodeURIComponent(document.getElementById('nombre').value));
-  p.push('cargo='+encodeURIComponent(document.getElementById('cargo').value));
-  p.push('telefono='+encodeURIComponent(document.getElementById('telefono').value));
-  p.push('email='+encodeURIComponent(document.getElementById('email').value));
-  p.push('compromiso_apoyo='+encodeURIComponent(state.commitment.apoyo||''));
-  p.push('compromiso_recursos='+encodeURIComponent(state.commitment.recursos||''));
-  p.push('compromiso_prioridad='+encodeURIComponent(state.commitment.prioridad||''));
-  for(var i=0;i<14;i++)p.push('M'+i+'='+state.scores[i+1]);
-  p.push('promedio_global='+parseFloat(r.globalAvg).toFixed(2));
-  p.push('porcentaje_global='+parseFloat(r.globalPct).toFixed(1));
-  p.push('estado_madurez='+encodeURIComponent(r.globalState.name));
-  p.push('prom_etapa1='+r.etapaScores[1].avg);p.push('prom_etapa2='+r.etapaScores[2].avg);
-  p.push('prom_etapa3='+r.etapaScores[3].avg);p.push('prom_etapa4='+r.etapaScores[4].avg);
-  var img=new Image();img.src=APPS_SCRIPT_URL+'?'+p.join('&');
-  }catch(err){console.error('Save error:',err)}
+  try{
+    var r=calcResults();
+    var payload={
+      timestamp: new Date().toLocaleString('es-CO',{timeZone:'America/Bogota'}),
+      empresa: document.getElementById('empresa').value,
+      nit: document.getElementById('nit').value,
+      municipio: document.getElementById('municipio').value,
+      actividad: document.getElementById('actividad').value,
+      tamano: document.getElementById('tamano').value,
+      nombre: document.getElementById('nombre').value,
+      cargo: document.getElementById('cargo').value,
+      telefono: document.getElementById('telefono').value,
+      email: document.getElementById('email').value,
+      compromiso_apoyo: state.commitment.apoyo||'',
+      compromiso_recursos: state.commitment.recursos||'',
+      compromiso_prioridad: state.commitment.prioridad||'',
+      promedio_global: parseFloat(r.globalAvg).toFixed(2),
+      porcentaje_global: parseFloat(r.globalPct).toFixed(1),
+      estado_madurez: r.globalState.name,
+      prom_etapa1: r.etapaScores[1].avg,
+      prom_etapa2: r.etapaScores[2].avg,
+      prom_etapa3: r.etapaScores[3].avg,
+      prom_etapa4: r.etapaScores[4].avg
+    };
+    for(var i=0;i<14;i++) payload['M'+i]=state.scores[i+1];
+
+    // Construir URL con parámetros
+    var params=[];
+    for(var k in payload) params.push(k+'='+encodeURIComponent(payload[k]));
+    var url=APPS_SCRIPT_URL+'?'+params.join('&');
+
+    console.log('Save URL length:',url.length,'| URL:',url);
+
+    // Método 1: sendBeacon (más confiable, funciona incluso si cierran la página)
+    var sent=false;
+    if(navigator.sendBeacon){
+      try{sent=navigator.sendBeacon(url);console.log('sendBeacon result:',sent)}catch(e){console.log('sendBeacon error:',e)}
+    }
+
+    // Método 2: fetch con keepalive (respaldo)
+    if(!sent){
+      try{
+        fetch(url,{method:'GET',mode:'no-cors',keepalive:true});
+        sent=true;
+        console.log('fetch sent');
+      }catch(e){console.log('fetch error:',e)}
+    }
+
+    // Método 3: Image beacon (último respaldo)
+    if(!sent){
+      var img=new Image();
+      img.src=url;
+      console.log('image beacon sent');
+    }
+
+    // Método 4: Reintento con retraso por si el primero falla silenciosamente
+    setTimeout(function(){
+      try{
+        var img2=new Image();
+        img2.src=url+'&retry=1';
+      }catch(e){}
+    }, 2000);
+
+  }catch(err){
+    console.error('Save error:',err);
+    alert('Error al guardar: '+err.message);
+  }
 }
 
 // ═══ JSON EXPORT ═══
