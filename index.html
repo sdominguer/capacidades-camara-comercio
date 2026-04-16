@@ -1904,11 +1904,12 @@ function saveToGoogleSheets() {
     prom_etapa4: results.etapaScores[4].avg
   };
 
+  // Usar text/plain para evitar CORS preflight — Apps Script parseará el JSON
   fetch(APPS_SCRIPT_URL, {
     method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     mode: 'no-cors',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(payload).toString()
+    body: JSON.stringify(payload)
   })
   .then(function() {
     spinner.style.display = 'none';
@@ -1920,7 +1921,7 @@ function saveToGoogleSheets() {
   .catch(function(err) {
     spinner.style.display = 'none';
     title.textContent = '⚠️ Error al guardar';
-    message.textContent = 'No se pudo conectar con la base de datos. Tu diagnóstico local sigue disponible. Error: ' + err.message;
+    message.textContent = 'No se pudo conectar. Error: ' + err.message;
     message.className = 'save-error';
     setTimeout(function() { overlay.classList.remove('active'); }, 4000);
   });
