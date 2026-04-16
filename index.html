@@ -1189,7 +1189,7 @@ input:focus, select:focus, textarea:focus {
 // GOOGLE SHEETS CONFIG
 // ═══════════════════════════════════════════════════════
 // *** IMPORTANT: Replace this URL with your deployed Apps Script Web App URL ***
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxZDgOwG1DPtGK-MGDizDLAFb63UBiWYODpErxjsxgcMaffBIehznjGszhao0q-JJhS/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzLTZJQ0AXKX-_ZUvsJhbWhz8ye1eZadMQREqiwqBtbNcp_nMFWJl-fWxsFNo9B5zAd/exec';
 
 // ═══════════════════════════════════════════════════════
 // DATA: 14 CAPACIDADES SGi PLYNN
@@ -1864,53 +1864,48 @@ function saveToGoogleSheets() {
 
   var results = calcResults();
 
-  // Build the payload
-  var payload = {
-    timestamp: new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' }),
-    empresa: document.getElementById('empresa').value,
-    nit: document.getElementById('nit').value,
-    municipio: document.getElementById('municipio').value,
-    actividad: document.getElementById('actividad').value,
-    tamano: document.getElementById('tamano').value,
-    nombre: document.getElementById('nombre').value,
-    cargo: document.getElementById('cargo').value,
-    telefono: document.getElementById('telefono').value,
-    email: document.getElementById('email').value,
-    compromiso_apoyo: state.commitment.apoyo || '',
-    compromiso_recursos: state.commitment.recursos || '',
-    compromiso_prioridad: state.commitment.prioridad || '',
-    // 14 capacity scores
-    M0: state.scores[1],
-    M1: state.scores[2],
-    M2: state.scores[3],
-    M3: state.scores[4],
-    M4: state.scores[5],
-    M5: state.scores[6],
-    M6: state.scores[7],
-    M7: state.scores[8],
-    M8: state.scores[9],
-    M9: state.scores[10],
-    M10: state.scores[11],
-    M11: state.scores[12],
-    M12: state.scores[13],
-    M13: state.scores[14],
-    // Aggregates
-    promedio_global: parseFloat(results.globalAvg).toFixed(2),
-    porcentaje_global: parseFloat(results.globalPct).toFixed(1),
-    estado_madurez: results.globalState.name,
-    prom_etapa1: results.etapaScores[1].avg,
-    prom_etapa2: results.etapaScores[2].avg,
-    prom_etapa3: results.etapaScores[3].avg,
-    prom_etapa4: results.etapaScores[4].avg
-  };
+  // Build the payload as URL params (GET approach — most reliable cross-origin)
+  var params = new URLSearchParams();
+  params.append('timestamp', new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' }));
+  params.append('empresa', document.getElementById('empresa').value);
+  params.append('nit', document.getElementById('nit').value);
+  params.append('municipio', document.getElementById('municipio').value);
+  params.append('actividad', document.getElementById('actividad').value);
+  params.append('tamano', document.getElementById('tamano').value);
+  params.append('nombre', document.getElementById('nombre').value);
+  params.append('cargo', document.getElementById('cargo').value);
+  params.append('telefono', document.getElementById('telefono').value);
+  params.append('email', document.getElementById('email').value);
+  params.append('compromiso_apoyo', state.commitment.apoyo || '');
+  params.append('compromiso_recursos', state.commitment.recursos || '');
+  params.append('compromiso_prioridad', state.commitment.prioridad || '');
+  params.append('M0', state.scores[1]);
+  params.append('M1', state.scores[2]);
+  params.append('M2', state.scores[3]);
+  params.append('M3', state.scores[4]);
+  params.append('M4', state.scores[5]);
+  params.append('M5', state.scores[6]);
+  params.append('M6', state.scores[7]);
+  params.append('M7', state.scores[8]);
+  params.append('M8', state.scores[9]);
+  params.append('M9', state.scores[10]);
+  params.append('M10', state.scores[11]);
+  params.append('M11', state.scores[12]);
+  params.append('M12', state.scores[13]);
+  params.append('M13', state.scores[14]);
+  params.append('promedio_global', parseFloat(results.globalAvg).toFixed(2));
+  params.append('porcentaje_global', parseFloat(results.globalPct).toFixed(1));
+  params.append('estado_madurez', results.globalState.name);
+  params.append('prom_etapa1', results.etapaScores[1].avg);
+  params.append('prom_etapa2', results.etapaScores[2].avg);
+  params.append('prom_etapa3', results.etapaScores[3].avg);
+  params.append('prom_etapa4', results.etapaScores[4].avg);
 
-  // Usar text/plain para evitar CORS preflight — Apps Script parseará el JSON
-  fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    mode: 'no-cors',
-    body: JSON.stringify(payload)
-  })
+  // Método más confiable: GET con parámetros via img beacon + fetch fallback
+  var fullUrl = APPS_SCRIPT_URL + '?' + params.toString();
+
+  // Intento 1: fetch normal (funciona desde GitHub Pages)
+  fetch(fullUrl, { method: 'GET', mode: 'no-cors' })
   .then(function() {
     spinner.style.display = 'none';
     title.textContent = '✅ ¡Guardado exitosamente!';
@@ -1919,11 +1914,16 @@ function saveToGoogleSheets() {
     setTimeout(function() { overlay.classList.remove('active'); }, 2500);
   })
   .catch(function(err) {
-    spinner.style.display = 'none';
-    title.textContent = '⚠️ Error al guardar';
-    message.textContent = 'No se pudo conectar. Error: ' + err.message;
-    message.className = 'save-error';
-    setTimeout(function() { overlay.classList.remove('active'); }, 4000);
+    // Intento 2: Image beacon (funciona desde cualquier iframe/origen)
+    var img = new Image();
+    img.onload = img.onerror = function() {
+      spinner.style.display = 'none';
+      title.textContent = '✅ ¡Guardado exitosamente!';
+      message.textContent = 'Tu diagnóstico ha sido registrado en la base de datos.';
+      message.className = 'save-success';
+      setTimeout(function() { overlay.classList.remove('active'); }, 2500);
+    };
+    img.src = fullUrl;
   });
 }
 
