@@ -1856,6 +1856,12 @@ function saveToGoogleSheets() {
   var message = document.getElementById('save-message');
   var spinner = document.getElementById('save-spinner');
 
+  // Verificar que la URL está configurada
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL === 'PEGA_AQUI_TU_URL_DEL_WEB_APP') {
+    alert('⚠️ ERROR: No has configurado la URL del Apps Script.\nEdita la variable APPS_SCRIPT_URL en el código.');
+    return;
+  }
+
   overlay.classList.add('active');
   title.textContent = 'Guardando resultados...';
   message.textContent = 'Enviando diagnóstico a la base de datos';
@@ -1864,7 +1870,7 @@ function saveToGoogleSheets() {
 
   var results = calcResults();
 
-  // Build the payload as URL params (GET approach — most reliable cross-origin)
+  // Build URL params
   var params = new URLSearchParams();
   params.append('timestamp', new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' }));
   params.append('empresa', document.getElementById('empresa').value);
@@ -1901,30 +1907,62 @@ function saveToGoogleSheets() {
   params.append('prom_etapa3', results.etapaScores[3].avg);
   params.append('prom_etapa4', results.etapaScores[4].avg);
 
-  // Método más confiable: GET con parámetros via img beacon + fetch fallback
   var fullUrl = APPS_SCRIPT_URL + '?' + params.toString();
 
-  // Intento 1: fetch normal (funciona desde GitHub Pages)
-  fetch(fullUrl, { method: 'GET', mode: 'no-cors' })
-  .then(function() {
+  // DEBUG: mostrar la URL en consola para poder probarla manualmente
+  console.log('=== DEBUG SAVE ===');
+  console.log('URL length:', fullUrl.length);
+  console.log('URL (copiar y pegar en navegador para probar):', fullUrl);
+
+  // Método 1: Script tag injection (más confiable que img para Apps Script)
+  var script = document.createElement('script');
+  script.src = fullUrl + '&callback=onSaveComplete';
+
+  window.onSaveComplete = function() {
     spinner.style.display = 'none';
     title.textContent = '✅ ¡Guardado exitosamente!';
-    message.textContent = 'Tu diagnóstico ha sido registrado en la base de datos.';
+    message.textContent = 'Diagnóstico registrado en la base de datos.';
     message.className = 'save-success';
     setTimeout(function() { overlay.classList.remove('active'); }, 2500);
-  })
-  .catch(function(err) {
-    // Intento 2: Image beacon (funciona desde cualquier iframe/origen)
+  };
+
+  script.onload = function() {
+    // Script loaded = request reached Google
+    if (spinner.style.display !== 'none') {
+      spinner.style.display = 'none';
+      title.textContent = '✅ ¡Guardado exitosamente!';
+      message.textContent = 'Diagnóstico registrado en la base de datos.';
+      message.className = 'save-success';
+      setTimeout(function() { overlay.classList.remove('active'); }, 2500);
+    }
+  };
+
+  script.onerror = function() {
+    console.log('Script inject failed, trying Image beacon...');
+    // Fallback: Image beacon
     var img = new Image();
     img.onload = img.onerror = function() {
       spinner.style.display = 'none';
-      title.textContent = '✅ ¡Guardado exitosamente!';
-      message.textContent = 'Tu diagnóstico ha sido registrado en la base de datos.';
+      title.textContent = '✅ Enviado';
+      message.textContent = 'Diagnóstico enviado (verificar en la hoja).';
       message.className = 'save-success';
       setTimeout(function() { overlay.classList.remove('active'); }, 2500);
     };
     img.src = fullUrl;
-  });
+  };
+
+  document.body.appendChild(script);
+
+  // Timeout safety net
+  setTimeout(function() {
+    if (spinner.style.display !== 'none') {
+      spinner.style.display = 'none';
+      title.textContent = '⏱️ Tiempo agotado';
+      message.innerHTML = 'No se confirmó el guardado.<br><br><strong>Debug:</strong> Abre la consola (F12) y copia la URL que aparece. Pégala en el navegador. Si guarda ahí, el problema es CORS/iframe.';
+      message.className = 'save-error';
+      setTimeout(function() { overlay.classList.remove('active'); }, 8000);
+    }
+  }, 10000);
 }
 
 // ═══════════════════════════════════════════════════════
